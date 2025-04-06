@@ -36,15 +36,19 @@ class SpaceWeatherEvent:
     """Class representing a space weather event like a solar flare or CME."""
     
     # Event types enumeration
+    # Event types enumeration
     EVENT_TYPES = [
         "SOLAR_FLARE", 
         "CME", 
         "GEOMAGNETIC_STORM", 
         "RADIATION_BELT", 
         "AURORA", 
-        "SOLAR_ENERGETIC_PARTICLE"
+        "SOLAR_ENERGETIC_PARTICLE",
+        "WSA_ENLIL",
+        "RADIO_BLACKOUT",
+        "HIGH_SPEED_STREAM",
+        "MAGNETOPAUSE_CROSSING"
     ]
-    
     # Severity levels
     SEVERITY_LEVELS = ["LOW", "MODERATE", "HIGH", "EXTREME", "UNKNOWN"]
     
@@ -64,52 +68,30 @@ class SpaceWeatherEvent:
         Initialize a space weather event.
         
         Args:
-            aurora_data = self._make_noaa_request(endpoint, use_cache=use_cache)
-            
-            # Process the data
-            forecast = {
-                "timestamp": datetime.now().isoformat(),
-                "forecast_time": aurora_data.get("Prediction_Time", "Unknown"),
-                "coordinates": aurora_data.get("coordinates", []),
-                "observation_quality": "good"  # Default value
-            }
-            
-            # Calculate aurora activity level based on data
-            if "coordinates" in aurora_data and aurora_data["coordinates"]:
-                # Calculate average aurora probability across coordinates
-                probabilities = []
-                for coord in aurora_data["coordinates"]:
-                    if isinstance(coord, dict) and "Aurora_Probability" in coord:
-                        probabilities.append(float(coord["Aurora_Probability"]))
-                
-                if probabilities:
-                    avg_probability = sum(probabilities) / len(probabilities)
-                    
-                    # Set activity level based on probability
-                    if avg_probability > 0.7:
-                        forecast["activity_level"] = "EXTREME"
-                    elif avg_probability > 0.5:
-                        forecast["activity_level"] = "HIGH" 
-                    elif avg_probability > 0.3:
-                        forecast["activity_level"] = "MODERATE"
-                    else:
-                        forecast["activity_level"] = "LOW"
-                        
-                    forecast["average_probability"] = avg_probability
-                    
-                    # Update current conditions
-                    self.current_conditions["aurora_activity"] = forecast["activity_level"]
-                    self.current_conditions["last_updated"] = datetime.now()
-            
-            return forecast
-            
-        except SpaceWeatherError as e:
-            logger.error(f"Error fetching aurora forecast: {e}")
-            raise
-            
-        except Exception as e:
-            logger.error(f"Unexpected error fetching aurora forecast: {e}")
-            raise SpaceWeatherError(f"Failed to retrieve aurora forecast: {str(e)}")
+                self._fetch_cmes_async(),
+                self._fetch_geomagnetic_storms_async(),
+                self._fetch_aurora_forecast_async(),
+                self._fetch_solar_conditions_async(),
+                self._fetch_geomagnetic_conditions_async(),
+                self._fetch_radio_blackouts_async(),
+                self._fetch_solar_energetic_particles_async(),
+                self._fetch_magnetopause_crossings_async(),
+                self._fetch_high_speed_streams_async(),
+                self._fetch_wsa_enlil_predictions_async()
+            end_time: Time when the event ended (if applicable)
+            description: Human-readable description of the event
+            link: URL to more information about the event
+            raw_data: Raw data from API for reference
+        """
+        self.event_id = event_id
+        self.event_type = event_type
+        self.start_time = start_time
+        self.end_time = end_time
+        self.source = source
+        self.severity = severity if severity in self.SEVERITY_LEVELS else "UNKNOWN"
+        self.description = description
+        self.link = link
+        self.raw_data = raw_data
     
     def get_geomagnetic_conditions(self, use_cache: bool = True) -> Dict[str, Any]:
         """
@@ -366,31 +348,318 @@ class SpaceWeatherEvent:
             raise
     
     # Similar async methods for other data types
-    async def _fetch_cmes_async(self):
-        """Asynchronously fetch CME data."""
-        # Implementation similar to _fetch_solar_flares_async
-        pass
-        
-    async def _fetch_geomagnetic_storms_async(self):
-        """Asynchronously fetch geomagnetic storm data."""
-        # Implementation similar to _fetch_solar_flares_async
-        pass
-        
-    async def _fetch_aurora_forecast_async(self):
-        """Asynchronously fetch aurora forecast data."""
-        # Implementation similar to _fetch_solar_flares_async
-        pass
-        
-    async def _fetch_solar_conditions_async(self):
-        """Asynchronously fetch solar conditions data."""
-        # Implementation similar to _fetch_solar_flares_async
-        pass
-        
-    async def _fetch_geomagnetic_conditions_async(self):
-        """Asynchronously fetch geomagnetic conditions data."""
-        # Implementation similar to _fetch_solar_flares_async
-        pass
-    
+    # Similar async methods for other data types
+    # Implementation of other async fetching methods
+    async def _fetch_radio_blackouts_async(self):
+        """Asynchronously fetch radio blackout data."""
+        try:
+            # Use aiohttp for async requests
+            async with aiohttp.ClientSession() as session:
+                # Form the request URL
+                url = f"{self.NASA_DONKI_URL}/RBE"
+                
+                # Set up parameters
+                start_date = datetime.now() - timedelta(days=2)
+                end_date = datetime.now()
+                params = {
+                    "startDate": start_date.strftime("%Y-%m-%d"),
+                    "endDate": end_date.strftime("%Y-%m-%d"),
+                    "api_key": self.nasa_api_key
+                }
+                
+                # Make the request
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    # Process radio blackouts
+                    if data:
+                        blackout_count = len(data)
+                        logger.info(f"Found {blackout_count} recent radio blackouts")
+                        
+                        # Update current events
+                        for blackout in data:
+                            try:
+                                event_id = blackout.get("rbeID", "unknown")
+                                
+                                # Skip if we already have this event
+                                if event_id in self.current_events:
+                                    continue
+                                    
+                                # Extract needed data and create event
+                                start_time = None
+                                if "startTime" in blackout:
+                                    try:
+                                        start_time = datetime.fromisoformat(blackout["startTime"].replace("Z", "+00:00"))
+                                    except (ValueError, TypeError):
+                                        logger.warning(f"Invalid start time format for radio blackout {event_id}")
+                                        
+                                # Determine severity based on class
+                                severity = "UNKNOWN"
+                                blackout_class = blackout.get("classType", "")
+                                
+                                if blackout_class.startswith("X"):
+                                    severity = "EXTREME"
+                                elif blackout_class.startswith("M"):
+                                    severity = "HIGH"
+                                elif blackout_class.startswith("C"):
+                                    severity = "MODERATE"
+                                elif blackout_class.startswith("B") or blackout_class.startswith("A"):
+                                    severity = "LOW"
+                                
+                                # Create description
+                                description = f"Radio Blackout: Class {blackout_class}"
+                                
+                                # Create event
+                                event = SpaceWeatherEvent(
+                                    event_id=event_id,
+                                    event_type="RADIO_BLACKOUT",
+                                    start_time=start_time,
+                                    end_time=None,  # Radio blackouts typically don't have end times in DONKI
+                                    source="NASA DONKI",
+                                    severity=severity,
+                                    description=description,
+                                    link=f"https://kauai.ccmc.gsfc.nasa.gov/DONKI/view/RBE/{event_id}",
+                                    raw_data=blackout
+                                )
+                                
+                                # Add to current events
+                                self.current_events[event_id] = event
+                                
+                            except Exception as e:
+                                logger.warning(f"Error processing radio blackout data: {e}")
+                                continue
+                        
+        except Exception as e:
+            logger.error(f"Error fetching radio blackouts async: {e}")
+            raise
+
+    async def _fetch_solar_energetic_particles_async(self):
+        """Asynchronously fetch solar energetic particle data."""
+        try:
+            # Use aiohttp for async requests
+            async with aiohttp.ClientSession() as session:
+                # Form the request URL
+                url = f"{self.NASA_DONKI_URL}/SEP"
+                
+                # Set up parameters
+                start_date = datetime.now() - timedelta(days=2)
+                end_date = datetime.now()
+                params = {
+                    "startDate": start_date.strftime("%Y-%m-%d"),
+                    "endDate": end_date.strftime("%Y-%m-%d"),
+                    "api_key": self.nasa_api_key
+                }
+                
+                # Make the request
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    # Process SEP events
+                    if data:
+                        sep_count = len(data)
+                        logger.info(f"Found {sep_count} recent solar energetic particle events")
+                        
+                        # Update current events
+                        for sep in data:
+                            try:
+                                event_id = sep.get("sepID", "unknown")
+                                
+                                # Skip if we already have this event
+                                if event_id in self.current_events:
+                                    continue
+                                    
+                                # Extract needed data and create event
+                                start_time = None
+                                if "eventTime" in sep:
+                                    try:
+                                        start_time = datetime.fromisoformat(sep["eventTime"].replace("Z", "+00:00"))
+                                    except (ValueError, TypeError):
+                                        logger.warning(f"Invalid event time format for SEP {event_id}")
+                                
+                                # Determine severity based on different factors
+                                severity = "HIGH"  # SEPs are usually high severity events
+                                
+                                # Create description
+                                instruments = ", ".join([i.get("displayName", "") for i in sep.get("instruments", [])])
+                                description = f"Solar Energetic Particle Event"
+                                if instruments:
+                                    description += f" detected by {instruments}"
+                                
+                                # Create event
+                                event = SpaceWeatherEvent(
+                                    event_id=event_id,
+                                    event_type="SOLAR_ENERGETIC_PARTICLE",
+                                    start_time=start_time,
+                                    end_time=None,
+                                    source="NASA DONKI",
+                                    severity=severity,
+                                    description=description,
+                                    link=f"https://kauai.ccmc.gsfc.nasa.gov/DONKI/view/SEP/{event_id}",
+                                    raw_data=sep
+                                )
+                                
+                                # Add to current events
+                                self.current_events[event_id] = event
+                                
+                            except Exception as e:
+                                logger.warning(f"Error processing SEP data: {e}")
+                                continue
+                        
+        except Exception as e:
+            logger.error(f"Error fetching solar energetic particles async: {e}")
+            raise
+
+    async def _fetch_magnetopause_crossings_async(self):
+        """Asynchronously fetch magnetopause crossing data."""
+        try:
+            # Use aiohttp for async requests
+            async with aiohttp.ClientSession() as session:
+                # Form the request URL
+                url = f"{self.NASA_DONKI_URL}/MPC"
+                
+                # Set up parameters
+                start_date = datetime.now() - timedelta(days=2)
+                end_date = datetime.now()
+                params = {
+                    "startDate": start_date.strftime("%Y-%m-%d"),
+                    "endDate": end_date.strftime("%Y-%m-%d"),
+                    "api_key": self.nasa_api_key
+                }
+                
+                # Make the request
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    # Process magnetopause crossings
+                    if data:
+                        mpc_count = len(data)
+                        logger.info(f"Found {mpc_count} recent magnetopause crossings")
+                        
+                        # Update current events
+                        for mpc in data:
+                            try:
+                                event_id = mpc.get("mpcID", "unknown")
+                                
+                                # Skip if we already have this event
+                                if event_id in self.current_events:
+                                    continue
+                                    
+                                # Extract needed data and create event
+                                start_time = None
+                                if "eventTime" in mpc:
+                                    try:
+                                        start_time = datetime.fromisoformat(mpc["eventTime"].replace("Z", "+00:00"))
+                                    except (ValueError, TypeError):
+                                        logger.warning(f"Invalid event time format for magnetopause crossing {event_id}")
+                                
+                                # Determine severity based on magnetopause crossing type
+                                # Inbound (toward Earth) is typically more relevant for space weather
+                                severity = "MODERATE"
+                                if "crossing" in mpc and mpc["crossing"] == "inbound":
+                                    severity = "HIGH"
+                                
+                                # Create description
+                                crossing_type = mpc.get("crossing", "unknown")
+                                spacecraft = mpc.get("spacecraft", "unknown spacecraft")
+                                description = f"Magnetopause Crossing: {crossing_type.capitalize()} crossing by {spacecraft}"
+                                
+                                # Create event
+                                event = SpaceWeatherEvent(
+                                    event_id=event_id,
+                                    event_type="MAGNETOPAUSE_CROSSING",
+                                    start_time=start_time,
+                                    end_time=None,
+                                    source="NASA DONKI",
+                                    severity=severity,
+                                    description=description,
+                                    link=f"https://kauai.ccmc.gsfc.nasa.gov/DONKI/view/MPC/{event_id}",
+                                    raw_data=mpc
+                                )
+                                
+                                # Add to current events
+                                self.current_events[event_id] = event
+                                
+                            except Exception as e:
+                                logger.warning(f"Error processing magnetopause crossing data: {e}")
+                                continue
+                        
+        except Exception as e:
+            logger.error(f"Error fetching magnetopause crossings async: {e}")
+            raise
+
+    async def _fetch_high_speed_streams_async(self):
+        """Asynchronously fetch high speed stream data."""
+        try:
+            # Use aiohttp for async requests
+            async with aiohttp.ClientSession() as session:
+                # Form the request URL
+                url = f"{self.NASA_DONKI_URL}/HSS"
+                
+                # Set up parameters
+                start_date = datetime.now() - timedelta(days=2)
+                end_date = datetime.now()
+                params = {
+                    "startDate": start_date.strftime("%Y-%m-%d"),
+                    "endDate": end_date.strftime("%Y-%m-%d"),
+                    "api_key": self.nasa_api_key
+                }
+                
+                # Make the request
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    # Process high speed streams
+                    if data:
+                        hss_count = len(data)
+                        logger.info(f"Found {hss_count} recent high speed streams")
+                        
+                        # Update current events
+                        for hss in data:
+                            try:
+614
+        try:
+            # Use aiohttp for async requests
+            async with aiohttp.ClientSession() as session:
+                # Form the request URL
+                url = f"{self.NASA_DONKI_URL}/CME"
+                
+                # Set up parameters
+                start_date = datetime.now() - timedelta(days=2)
+                end_date = datetime.now()
+                params = {
+                    "startDate": start_date.strftime("%Y-%m-%d"),
+                    "endDate": end_date.strftime("%Y-%m-%d"),
+                    "api_key": self.nasa_api_key
+                }
+                
+                # Make the request
+                async with session.get(url, params=params) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    
+                    # Process CMEs
+                    if data:
+                        cme_count = len(data)
+                        logger.info(f"Found {cme_count} recent CMEs")
+                        
+                        # Update current events
+                        for cme in data:
+                            try:
+                                cme_id = cme.get("activityID", "unknown")
+                                
+                                # Skip if we already have this event
+                                if cme_id in self.current_events:
+                                    continue
+                                    
+                                # Parse dates
+                                start_time = None
+                                if "startTime" in cme:
+                                    try:
+                                        start_time = datetime.fromisoformat(cme["startTime"].replace
     def _check_for_significant_events(self):
         """
         Check for significant space weather events that require notification.
@@ -446,24 +715,13 @@ class SpaceWeatherEvent:
         """
         Register a callback function to be notified of space weather events.
         
-            event_type: Type of space weather event (e.g., SOLAR_FLARE, CME)
-            start_time: Time when the event started
-            source: Data source for the event (e.g., NASA, NOAA)
-            severity: Severity level of the event (LOW, MODERATE, HIGH, EXTREME, UNKNOWN)
-            end_time: Time when the event ended (if applicable)
-            description: Human-readable description of the event
-            link: URL to more information about the event
-            raw_data: Raw data from API for reference
+        Args:
+            callback: Function that will be called when new space weather events occur.
+                     The function must accept a SpaceWeatherEvent parameter.
         """
-        self.event_id = event_id
-        self.event_type = event_type
-        self.start_time = start_time
-        self.end_time = end_time
-        self.source = source
-        self.severity = severity if severity in self.SEVERITY_LEVELS else "UNKNOWN"
-        self.description = description
-        self.link = link
-        self.raw_data = raw_data
+        if callback not in self.event_callbacks:
+            self.event_callbacks.append(callback)
+            logger.info("Registered new space weather event callback")
     
     @property
     def duration(self) -> Optional[timedelta]:
@@ -1031,7 +1289,52 @@ class SpaceWeatherMonitor:
             endpoint = "ovation_aurora_latest.json"
             
             # Make the API request
-            aurora_data = self._make_noaa_request(endpoint, use_cache=use_cache
+            aurora_data = self._make_noaa_request(endpoint, use_cache=use_cache)
+            
+            # Process the data
+            forecast = {
+                "timestamp": datetime.now().isoformat(),
+                "forecast_time": aurora_data.get("Prediction_Time", "Unknown"),
+                "coordinates": aurora_data.get("coordinates", []),
+                "observation_quality": "good"  # Default value
+            }
+            
+            # Calculate aurora activity level based on data
+            if "coordinates" in aurora_data and aurora_data["coordinates"]:
+                # Calculate average aurora probability across coordinates
+                probabilities = []
+                for coord in aurora_data["coordinates"]:
+                    if isinstance(coord, dict) and "Aurora_Probability" in coord:
+                        probabilities.append(float(coord["Aurora_Probability"]))
+                
+                if probabilities:
+                    avg_probability = sum(probabilities) / len(probabilities)
+                    
+                    # Set activity level based on probability
+                    if avg_probability > 0.7:
+                        forecast["activity_level"] = "EXTREME"
+                    elif avg_probability > 0.5:
+                        forecast["activity_level"] = "HIGH" 
+                    elif avg_probability > 0.3:
+                        forecast["activity_level"] = "MODERATE"
+                    else:
+                        forecast["activity_level"] = "LOW"
+                        
+                    forecast["average_probability"] = avg_probability
+                    
+                    # Update current conditions
+                    self.current_conditions["aurora_activity"] = forecast["activity_level"]
+                    self.current_conditions["last_updated"] = datetime.now()
+            
+            return forecast
+            
+        except SpaceWeatherError as e:
+            logger.error(f"Error fetching aurora forecast: {e}")
+            raise
+            
+        except Exception as e:
+            logger.error(f"Unexpected error fetching aurora forecast: {e}")
+            raise SpaceWeatherError(f"Failed to retrieve aurora forecast: {str(e)}")
     
     def _write_cache(self, cache_path: Path, data: Dict[str, Any]) -> None:
         """
@@ -1173,5 +1476,54 @@ class SpaceWeatherMonitor:
             
         except json.JSONDecodeError:
             logger.error("Failed to parse NOAA API response")
-            raise SpaceWeatherError("Invalid NO
-
+            raise SpaceWeatherError("Invalid NOAA API response format")
+            
+    def start_monitoring(self) -> None:
+        """
+        Start the background monitoring task.
+        
+        This method starts an asynchronous task that periodically fetches
+        and processes space weather data.
+        """
+        if not self.monitoring_active:
+            self.monitoring_active = True
+            
+            # Create a new event loop if we're not already in one
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+            # Start the monitoring task
+            self.monitoring_task = asyncio.ensure_future(self._monitoring_task())
+            logger.info(f"Started space weather monitoring (interval: {self.monitoring_interval}s)")
+            
+    def stop_monitoring(self) -> None:
+        """
+        Stop the background monitoring task.
+        """
+        if self.monitoring_active:
+            self.monitoring_active = False
+            
+            if self.monitoring_task:
+                self.monitoring_task.cancel()
+                self.monitoring_task = None
+                
+            logger.info("Stopped space weather monitoring")
+            
+    def get_current_condition_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of current space weather conditions.
+        
+        Returns:
+            Dictionary containing current space weather conditions
+        """
+        return {
+            "solar_activity": self.current_conditions.get("solar_activity", "UNKNOWN"),
+            "geomagnetic_activity": self.current_conditions.get("geomagnetic_activity", "UNKNOWN"),
+            "aurora_activity": self.current_conditions.get("aurora_activity", "UNKNOWN"),
+            "last_updated": self.current_conditions.get("last_updated", None),
+            "active_alerts": len([e for e in self.current_events.values() 
+                               if e.severity in ["HIGH", "EXTREME"] and e.is_ongoing])
+        }
