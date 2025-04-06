@@ -1,0 +1,8 @@
+planetary_view = PlanetaryView(parent)
+planetary_view.view_updated.connect(your_update_handler)
+planetary_view.planet_selected.connect(your_selection_handler)
+planetary_view.event_detected.connect(your_event_handler)
+
+settings_dialog = SettingsDialog(parent_window)
+settings_dialog.settings_applied.connect(your_settings_handler)
+result = settings_dialog.exec()
