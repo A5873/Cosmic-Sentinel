@@ -1,11 +1,23 @@
-# Cosmic Sentinel
+<div align="center">
+  <img src="assets/images/logo.svg" alt="Cosmic Sentinel Logo" width="500">
+  <h1>Cosmic Sentinel</h1>
+  <p>
+    <img src="https://img.shields.io/badge/Status-Beta-blue?style=flat-square" alt="Beta Status">
+    <img src="https://img.shields.io/badge/Version-1.0.0--beta-orange?style=flat-square" alt="Version 1.0.0-beta">
+    <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License">
+  </p>
+</div>
 
 A comprehensive space observation and monitoring platform for astronomers and space enthusiasts.
+
+[Project Plan & Roadmap](PROJECT.md) | [Features](#features) | [Installation](#installation) | [Usage](#usage) | [Story](#project-story)
 
 ## Why This Software Matters
 
 Cosmic Sentinel isn't just a space tracker - it's a powerful AI-enhanced observatory at your fingertips.
 Whether you're a hobbyist looking at the night sky or a researcher analyzing space data, this app brings the universe to your desktop.
+
+> Check out our detailed [Project Plan](PROJECT.md) for current status, roadmap, and future enhancements.
 
 ## Features
 
@@ -128,3 +140,10 @@ using Cosmic Sentinel. Feel free to reach out on the
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+<div align="center">
+  <img src="assets/images/icon.svg" alt="Cosmic Sentinel Icon" width="60">
+  <p>Cosmic Sentinel &copy; 2025</p>
+</div>
