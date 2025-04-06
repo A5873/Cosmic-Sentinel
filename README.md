@@ -23,7 +23,7 @@ Whether you're a hobbyist looking at the night sky or a researcher analyzing spa
 
 - **Planetary Tracking**: Track and visualize planetary positions and movements
 - **Asteroid Monitoring**: Monitor near-Earth objects and potentially hazardous asteroids
-- **Space Weather Monitor**: Track solar activity, geomagnetic conditions, and aurora forecasts
+- **Space Weather Monitor**: Track solar activity, geomagnetic conditions, and aurora forecasts with AI-powered flare prediction
 - **Reporting**: Generate detailed reports and visualizations
 
 ## Installation
@@ -54,7 +54,6 @@ The application can be configured through:
 ### Space Weather Monitor Configuration
 
 Space weather monitoring can be configured with the following settings:
-
 ```ini
 [space_weather]
 monitoring_interval = 3600        # Update interval in seconds
@@ -65,6 +64,10 @@ cme_alerts = true                 # Enable CME alerts
 geomagnetic_storm_alerts = true   # Enable geomagnetic storm alerts
 aurora_alerts = true              # Enable aurora alerts
 minimum_alert_severity = MODERATE # Minimum severity for alerts
+use_ml_prediction = true          # Enable ML-based solar flare prediction
+prediction_confidence = 0.7       # Minimum confidence threshold for predictions
+prediction_hours = 24             # Hours ahead to predict flares
+```
 ```
 
 ## Usage
@@ -113,8 +116,7 @@ Our stack combines proven technologies with cutting-edge tools optimized for ast
 - **gRPC**: High-performance RPC framework for service communication
 - **Redis**: In-memory caching for ephemeris data and frequent calculations
 - **Docker/Kubernetes**: Containerization and orchestration for development and deployment
-
-### Space Data Integration
+- **Space Data Integration**
 
 Cosmic Sentinel integrates with multiple space agency APIs and data sources:
 
@@ -123,6 +125,8 @@ Cosmic Sentinel integrates with multiple space agency APIs and data sources:
 - **ESA Space Situational Awareness**: Near-Earth object and debris tracking
 - **NOAA SWPC**: Geomagnetic storm predictions and space weather alerts
 - **Minor Planet Center**: Asteroid and comet observational data
+- **Gaia DR3**: Star catalog and reference frame data
+- **GOES X-ray Flux**: Real-time solar X-ray data for flare prediction
 - **Gaia DR3**: Star catalog and reference frame data
 
 These integrations use a unified adapter pattern with exponential backoff for reliable data acquisition.
@@ -147,6 +151,7 @@ The system addresses several real-time processing challenges:
 - **Latency Management**: Prioritization queue for time-critical alerts (e.g., NEO approaches)
 - **Backpressure Handling**: Rate limiting and buffering for data surge management
 - **Fault Tolerance**: Circuit breakers to handle API failures gracefully
+- **Deep Learning Inference**: Optimized CNN-LSTM models for real-time solar flare prediction
 
 Our architecture balances theoretical accuracy with practical performance needs, focusing on delivering actionable astronomical intelligence while maintaining sub-second response times for interactive visualizations.
 
